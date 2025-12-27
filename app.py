@@ -260,7 +260,7 @@ def fmt_int(x: Optional[float]) -> str:
     return f"{int(x):,}".replace(",", " ")
 
 
-st.title("Suivi des indices boursiers - pour papa & maman")
+st.title("Suivi des indices boursiers")
 
 CLIENT_CHOICES = ["Delphine & Guillaume", "Delphine", "Guillaume"]
 client = st.radio("Compte", CLIENT_CHOICES, horizontal=True)
