@@ -17,10 +17,12 @@ import ast
 import pandas as pd
 from playwright.async_api import async_playwright
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
 
 def ensure_playwright_installed():
     subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "chromium"],
+        [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
         check=True,
     )
     return True
@@ -131,6 +133,18 @@ def get_close_series(
 
     return pd.Series(dtype="float64")
 
+
+_executor = ThreadPoolExecutor(max_workers=1)
+
+def run_async_in_thread(coro):
+    def _job():
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+    return _executor.submit(_job).result()
+
 async def fetch_history_df(ticker: str) -> pd.DataFrame:
     if ticker == "FR001400G321" : 
         structure_url = "https://quantalys.com/Structure/2087537"
@@ -160,7 +174,7 @@ async def fetch_history_df(ticker: str) -> pd.DataFrame:
     return df
 
 def fetch_history_df_sync(ticker: str) -> pd.DataFrame:
-    return asyncio.run(fetch_history_df(ticker))
+    return run_async_in_thread(fetch_history_df(ticker))
 
 def get_df_cached(ticker: str) -> pd.DataFrame:
     return fetch_history_df_sync(ticker)
