@@ -1,4 +1,5 @@
-import os
+import os, sys
+import subprocess
 import datetime as dt
 from dataclasses import dataclass
 from typing import Optional, Dict, List, Tuple
@@ -17,6 +18,14 @@ import pandas as pd
 from playwright.async_api import async_playwright
 import asyncio
 
+def ensure_playwright_installed():
+    subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        check=True,
+    )
+    return True
+
+ensure_playwright_installed()
 
 st.set_page_config(page_title="Dashboard ISIN", layout="wide")
 

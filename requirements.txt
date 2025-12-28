@@ -4,5 +4,4 @@ numpy>=1.24
 requests>=2.31
 yfinance>=0.2
 python-dateutil>=2.8
-playwright
-html
+playwright==1.57.0
