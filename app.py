@@ -28,7 +28,7 @@ def ensure_playwright_installed():
         text=True,
     )
     if proc.returncode != 0:
-        raise RuntimeError(f"playwright install failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}")
+        raise RuntimeError(f"playwright install failed:\OUT:\n{proc.stdout}\ERROR:\n{proc.stderr}")
     return True
 
 ensure_playwright_installed()
@@ -429,8 +429,8 @@ for nm in selected_names:
     selected_isins.extend(name_to_isins.get(nm, []))
 selected_isins = list(dict.fromkeys(selected_isins))
 
-if selected_isins :#in isins_codes.values() :
-    # selected = names_to_isin[selected_name]
+if selected_isins :
+
     if period_chart in ["1D", "5D"] : 
         key = "new"
     elif period_chart == "1M":
