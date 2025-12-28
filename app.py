@@ -11,6 +11,12 @@ import yfinance as yf
 from dateutil.relativedelta import relativedelta
 import json
 import altair as alt
+import html as htmllib
+import ast
+import pandas as pd
+from playwright.async_api import async_playwright
+import asyncio
+
 
 st.set_page_config(page_title="Dashboard ISIN", layout="wide")
 
@@ -122,9 +128,46 @@ def get_close_series(
 
     return pd.Series(dtype="float64")
 
+async def fetch_history_df(ticker: str) -> pd.DataFrame:
+    if ticker == "FR001400G321" : 
+        structure_url = "https://quantalys.com/Structure/2087537"
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(structure_url, wait_until="networkidle")
+
+        div_html = await page.inner_html("#chartHistoriqueY5")
+        await browser.close()
+
+    decoded = htmllib.unescape(div_html)
+
+    idx_start = decoded.find("dataProvider")
+    idx_end = decoded.find("decimalSeparator")
+    if idx_start == -1 or idx_end == -1 or idx_end <= idx_start:
+        raise RuntimeError("dataProvider/decimalSeparator introuvable dans le div.")
+
+    extracted_string = decoded[idx_start + len("dataProvider") + 2 : idx_end - 2]
+    x = ast.literal_eval(extracted_string)
+
+    rows = [{"Date": pd.to_datetime(i["x"]), "Close": float(i["y_0"])} for i in x]
+    df = pd.DataFrame(rows).set_index("Date").sort_index()
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+
+    df.columns = pd.MultiIndex.from_product([["Close"], [ticker]], names=["Price", "Ticker"])
+    return df
+
+def fetch_history_df_sync(ticker: str) -> pd.DataFrame:
+    return asyncio.run(fetch_history_df(ticker))
+
+def get_df_cached(ticker: str) -> pd.DataFrame:
+    return fetch_history_df_sync(ticker)
 
 @st.cache_data(ttl=60 * 60)
 def load_history(yahoo_symbol: str, years: int = 60, period: str = "mid") -> pd.DataFrame:
+    if yahoo_symbol in ["FR001400G321"] : 
+        df = get_df_cached(yahoo_symbol)
+        return df
+    
     if not isinstance(yahoo_symbol, str) or not yahoo_symbol.strip():
         return pd.DataFrame()
     
@@ -299,11 +342,13 @@ for k, mi in enumerate(mapped):
     if not yahoo:
         rows.append({"ISIN": mi.isin, "Nom": mi.name or "—", "Ticker": "—", "Cap.": "—", "Var. jour": "—", **{p: "—" for p in PERIODS}})
         continue
-
-    old_hist = load_history(yahoo, period = "old")
-    mid_hist = load_history(yahoo, period = "mid")
-    mid_up_hist = load_history(yahoo, period = "mid_up")
-    new_hist = load_history(yahoo, period = "new")
+    if yahoo == mi.isin : 
+        old_hist = mid_hist = mid_up_hist = new_hist = load_history(yahoo)
+    else : 
+        old_hist = load_history(yahoo, period = "old")
+        mid_hist = load_history(yahoo, period = "mid")
+        mid_up_hist = load_history(yahoo, period = "mid_up")
+        new_hist = load_history(yahoo, period = "new")
 
     hist = {
         "old": old_hist,
@@ -315,14 +360,20 @@ for k, mi in enumerate(mapped):
         rows.append({"ISIN": mi.isin, "Nom": mi.name or "—", "Ticker": yahoo, "Cap.": "—", "Var. jour": "—", **{p: "—" for p in PERIODS}})
         continue
 
-    info = load_info(yahoo)
+    try : 
+        if yahoo == mi.isin : 
+            info = {}
+        else : 
+            info = load_info(yahoo)
+    except : 
+        info = {}
 
     perf = {p: fmt_pct(perf_from_close(hist, yahoo, p)) for p in PERIODS}
     varj = fmt_pct(daily_change_pct(hist, yahoo, "1D"))
 
     rows.append({
         "ISIN": mi.isin,
-        "Nom": mi.name or info.get("shortName") or info.get("longName") or "—",
+        "Nom": mi.name or info.get("shortName") or info.get("longName") or mi.isin,
         "Ticker": yahoo,
         "Var. jour": varj,
         **perf,
@@ -403,7 +454,6 @@ if selected_isins :#in isins_codes.values() :
                 df_one["Value"] = df_one["Value"] / base * 100.0
 
         df_one["Name"] = isins_codes.get(isin, isin)
-        print(df_one)
         df_one = df_one.rename(columns={date_col: "Date"})
 
         long_frames.append(df_one[["Date", "Name", "Value"]])
@@ -440,55 +490,3 @@ if selected_isins :#in isins_codes.values() :
 else:
     st.info("Sélectionnez au moins un indice.")
     
-    # old_timepoint = get_first_timepoint(charts[selected][key]["Close"], period_chart)
-    # plot_df = charts[selected][key]["Close"][charts[selected][key]["Close"].index > old_timepoint]
-    # while plot_df.shape[0] == 1 and period_chart == "1D" : 
-    #     old_timepoint -= relativedelta(days=1)
-    #     plot_df = charts[selected][key]["Close"][charts[selected][key]["Close"].index > old_timepoint]
-
-    # values_list = np.asarray(plot_df).astype(float)
-    # y_min, y_max = min(values_list)[0], max(values_list)[0]
-
-    # padding = (y_max - y_min) * 0.05
-    # y_domain = [y_min - padding, y_max + padding]
-
-    # df_plot = plot_df.reset_index()
-    # date_col = df_plot.columns[0]
-    # price_col = df_plot.columns[1] 
-    # df_plot = df_plot.rename(columns={price_col: "Value"})
-
-    # df_plot[date_col] = pd.to_datetime(df_plot[date_col])
-    # label_fmt = "%Y-%m-%d %H:%M" if key in ["new", "mid", "mid_up"] else "%Y-%m-%d"
-    # df_plot["XLabel"] = df_plot[date_col].dt.strftime(label_fmt)
-
-    # n = len(df_plot)
-    # tick_count = 5
-    # step = max(1, n // tick_count)
-    # tick_values = df_plot["XLabel"].iloc[::step].tolist()
-
-    # chart = (
-    #     alt.Chart(df_plot)
-    #     .mark_line()
-    #     .encode(
-    #         x=alt.X(
-    #             "XLabel:O",
-    #             title="Date",
-    #             axis=alt.Axis(values=tick_values, labelAngle=0),
-    #             sort=None,
-    #         ),
-    #         y=alt.Y(
-    #             f"Value:Q",
-    #             scale=alt.Scale(domain=[float(y_domain[0]), float(y_domain[1])]),
-    #             title="Value",
-    #         ),
-    #         tooltip=[
-    #             alt.Tooltip(f"{date_col}:T", title="Date"),
-    #             alt.Tooltip(f"Value:Q", title="Value", format=",.2f")
-    #         ],
-    #     )
-    # )
-
-
-    # st.altair_chart(chart, width='stretch')
-# else:
-#     st.warning("Pas de données historiques à afficher pour cet ISIN.")
