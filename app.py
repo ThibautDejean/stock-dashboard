@@ -43,10 +43,6 @@ def _openfigi_headers() -> Dict[str, str]:
 
 @st.cache_data(ttl=6 * 60 * 60)
 def map_isins_openfigi(isins: Tuple[str, ...]) -> List[MappedInstrument]:
-    """
-    Mappe une liste d'ISIN via OpenFIGI "mapping".
-    Retourne name + ticker quand disponible.
-    """
     if not isins:
         return []
 
@@ -60,7 +56,6 @@ def map_isins_openfigi(isins: Tuple[str, ...]) -> List[MappedInstrument]:
     out: List[MappedInstrument] = []
     for isin, item in zip(isins, data):
         mi = MappedInstrument(isin=isin)
-        # OpenFIGI renvoie souvent "data": [ ... ] ou "error"
         rows = item.get("data") or []
         if rows:
             best = rows[0]
@@ -106,7 +101,6 @@ def get_close_series(
             return pd.Series(dtype="float64")
         hist = df
 
-    # Sécurité
     if not isinstance(hist, pd.DataFrame) or hist.empty:
         return pd.Series(dtype="float64")
 
