@@ -20,11 +20,15 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 
+@st.cache_resource(show_spinner=False)
 def ensure_playwright_installed():
-    subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
-        check=True,
+    proc = subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        capture_output=True,
+        text=True,
     )
+    if proc.returncode != 0:
+        raise RuntimeError(f"playwright install failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}")
     return True
 
 ensure_playwright_installed()
