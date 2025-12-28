@@ -363,6 +363,7 @@ for k, mi in enumerate(mapped):
     if not yahoo:
         rows.append({"ISIN": mi.isin, "Nom": mi.name or "—", "Ticker": "—", "Cap.": "—", "Var. jour": "—", **{p: "—" for p in PERIODS}})
         continue
+    
     if yahoo == mi.isin : 
         old_hist = mid_hist = mid_up_hist = new_hist = load_history(yahoo)
     else : 
@@ -377,10 +378,7 @@ for k, mi in enumerate(mapped):
         "mid_up" : mid_up_hist,
         "new": new_hist,
         }
-    if hist["new"].empty or "Close" not in hist["new"].columns:
-        rows.append({"ISIN": mi.isin, "Nom": mi.name or "—", "Ticker": yahoo, "Cap.": "—", "Var. jour": "—", **{p: "—" for p in PERIODS}})
-        continue
-
+    
     with open('extra_names.json') as f : 
         extra_names_mapping = json.load(f)
 
@@ -392,6 +390,10 @@ for k, mi in enumerate(mapped):
             info = load_info(yahoo)
     except : 
         info = {}
+
+    if hist["new"].empty or "Close" not in hist["new"].columns:
+        rows.append({"ISIN": mi.isin, "Nom": mi.name or "—", "Ticker": yahoo, "Cap.": "—", "Var. jour": "—", **{p: "—" for p in PERIODS}})
+        continue
 
     perf = {p: fmt_pct(perf_from_close(hist, yahoo, p)) for p in PERIODS}
     varj = fmt_pct(daily_change_pct(hist, yahoo, "1D"))
