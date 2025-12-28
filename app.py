@@ -381,9 +381,13 @@ for k, mi in enumerate(mapped):
         rows.append({"ISIN": mi.isin, "Nom": mi.name or "—", "Ticker": yahoo, "Cap.": "—", "Var. jour": "—", **{p: "—" for p in PERIODS}})
         continue
 
+    with open('extra_names.json') as f : 
+        extra_names_mapping = json.load(f)
+
     try : 
         if yahoo == mi.isin : 
             info = {}
+            mi.name = extra_names_mapping[mi.isin]
         else : 
             info = load_info(yahoo)
     except : 
